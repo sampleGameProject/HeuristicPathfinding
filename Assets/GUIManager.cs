@@ -15,6 +15,14 @@ public class GUIManager : MonoBehaviour
 
 	Dictionary<long, GameObject> buttons = new Dictionary<long, GameObject>();
 
+	public Button startButton;
+
+	public Button pauseButton;
+	public Button nextStepButton;
+
+	public GameObject presetPanel;
+	public GameObject demonstationPanel;
+
 	void Start()
 	{
 		slider.gameObject.SetActive(false);
@@ -24,7 +32,29 @@ public class GUIManager : MonoBehaviour
 		{
 			buttons[roadHash].GetComponentInChildren<Text>().text = weight.ToString();
 		};
+
+		world.OnWorldModeChanged += (isPresetMode) => 
+		{
+			if(!isPresetMode)
+			{
+				HideSlider();
+				currentRoadHash = 0;
+			}
+				
+			presetPanel.gameObject.SetActive(isPresetMode);
+			demonstationPanel.gameObject.SetActive(!isPresetMode);
+		};
+
+		world.OnPauseToggled += (sender, e) => 
+		{
+			pauseButton.GetComponentInChildren<Text>().text = world.IsPause ? PAUSE_ACTIVE : PAUSE_NOT_ACTIVE;
+			nextStepButton.interactable = world.IsPause;
+		};
 	}
+
+	const string PAUSE_ACTIVE = "Продолжить";
+	const string PAUSE_NOT_ACTIVE = "Пауза";
+
 
 	void OnSliderValueChanged(float val)
 	{
@@ -55,6 +85,11 @@ public class GUIManager : MonoBehaviour
 		pos.x = (worldPos.x / (worldWidth * 0.5f )) * canvasWidth * 0.5f;
 		pos.y = (worldPos.y / (worldHeight * 0.5f )) * canvasHeight * 0.5f;
 		return pos;
+	}
+
+	void HideSlider()
+	{
+		slider.gameObject.SetActive(false);
 	}
 
 	void ShowSlider (long roadHash)

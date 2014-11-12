@@ -4,252 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 
-public static class ColorHelper
-{
-	public static void HsvToRgb(double h, double S, double V, out int r, out int g, out int b)
-	{
-		// ######################################################################
-		// T. Nathan Mundhenk
-		// mundhenk@usc.edu
-		// C/C++ Macro HSV to RGB
-		
-		double H = h;
-		while (H < 0) { H += 360; };
-		while (H >= 360) { H -= 360; };
-		double R, G, B;
-		if (V <= 0)
-		{ R = G = B = 0; }
-		else if (S <= 0)
-		{
-			R = G = B = V;
-		}
-		else
-		{
-			float hf = (float)(H / 60.0);
-			int i = (int)Mathf.Floor(hf);
-			double f = hf - i;
-			double pv = V * (1 - S);
-			double qv = V * (1 - S * f);
-			double tv = V * (1 - S * (1 - f));
-			switch (i)
-			{
-				
-				// Red is the dominant color
-				
-			case 0:
-				R = V;
-				G = tv;
-				B = pv;
-				break;
-				
-				// Green is the dominant color
-				
-			case 1:
-				R = qv;
-				G = V;
-				B = pv;
-				break;
-			case 2:
-				R = pv;
-				G = V;
-				B = tv;
-				break;
-				
-				// Blue is the dominant color
-				
-			case 3:
-				R = pv;
-				G = qv;
-				B = V;
-				break;
-			case 4:
-				R = tv;
-				G = pv;
-				B = V;
-				break;
-				
-				// Red is the dominant color
-				
-			case 5:
-				R = V;
-				G = pv;
-				B = qv;
-				break;
-				
-				// Just in case we overshoot on our math by a little, we put these here. Since its a switch it won't slow us down at all to put these here.
-				
-			case 6:
-				R = V;
-				G = tv;
-				B = pv;
-				break;
-			case -1:
-				R = V;
-				G = pv;
-				B = qv;
-				break;
-				
-				// The color is not defined, we should throw an error.
-				
-			default:
-				//LFATAL("i Value error in Pixel conversion, Value is %d", i);
-				R = G = B = V; // Just pretend its black/white
-				break;
-			}
-		}
-		r = Clamp((int)(R * 255.0));
-		g = Clamp((int)(G * 255.0));
-		b = Clamp((int)(B * 255.0));
-	}
-	
-	/// <summary>
-	/// Clamp a value to 0-255
-	/// </summary>
-	static int Clamp(int i)
-	{
-		if (i < 0) return 0;
-		if (i > 255) return 255;
-		return i;
-	}
-}
 
-public struct NodeData
-{
-	public Vector3 Position {get;set;}
-	public int Id {get;set;}
-}
-
-public struct RoadData
-{
-	public NodeData To {get;set;}
-	public NodeData From {get;set;}
-	public int Weight {get;set;}
-}
-
-public class NodeManager
-{
-	public const int MaxWeight = 100;
-
-	public delegate void RoadWeightChangeDelegate(long roadHash, int weight);
-	public event RoadWeightChangeDelegate OnRoadWeightChanged;
-
-	public Dictionary<int,NodeData> nodes; 
-	public int[,] incidenceMatrix;
-
-	public int StartNode {
-		get;
-		set;
-	}
-
-	public int FinishNode {
-		get;
-		set;
-	}
-
-	public NodeManager(NodeData[] nodes,int[,] incidenceMatrix)
-	{
-		this.nodes = new Dictionary<int,NodeData>();
-
-		foreach(var node in nodes)
-			this.nodes.Add(node.Id,node);
-
-		this.incidenceMatrix = incidenceMatrix;
-	}
-
-	
-	public RoadData[] GetRoadsForNode(NodeData node)
-	{
-		return GetRoadsForNode(node.Id);
-	}
-
-	public RoadData[] GetRoadsForNode(int nodeId)
-	{
-		List<RoadData> ret = new List<RoadData>();
-		
-		for(int i = 0; i < incidenceMatrix.GetLength(0); i++)
-		{
-			if(incidenceMatrix[nodeId,i] != -1) // road is exists
-			{
-				ret.Add(new RoadData()
-		        {
-					From = nodes[nodeId],
-					To = nodes[i],
-					Weight = incidenceMatrix[nodeId,i]
-				});
-			}
-			else
-			{
-				if(incidenceMatrix[i,nodeId] != -1) // road is exists
-				{
-					ret.Add(new RoadData()
-					        {
-						From = nodes[nodeId],
-						To = nodes[i],
-						Weight = incidenceMatrix[i,nodeId]
-					});
-				}
-			}
-		}
-		
-		return ret.ToArray();
-	}
-
-	public RoadData[] GetAllRoads()
-	{
-		List<RoadData> ret = new List<RoadData>();
-
-		for(int i = 0; i < incidenceMatrix.GetLength(0); i++)
-			for(int j = i+1; j < incidenceMatrix.GetLength(0); j++)
-			{
-				if(incidenceMatrix[i,j] == -1)
-					continue;
-
-				ret.Add(new RoadData()
-		        {
-					From = nodes[i],
-					To = nodes[j],
-					Weight = incidenceMatrix[i,j]
-				});
-			}		
-		return ret.ToArray();
-	}
-
-	public static long GetRoadHash(int i, int j)
-	{
-		return (long)((((ulong)(Mathf.Min (i,j)))) << 32 | ((ulong)(Mathf.Max (i,j))));
-	}
-
-	public int GetRoadWeight (long roadHash)
-	{
-		int i = (int)(roadHash >> 32);
-		int j = (int)roadHash;
-
-		var weight = incidenceMatrix[i,j];
-
-		if(weight == -1)
-			weight = incidenceMatrix[j,i];
-
-		return weight;
-	}
-
-	public void SetRoadWeight (long roadHash, float val)
-	{
-		int i = (int)(roadHash >> 32);
-		int j = (int)roadHash;
-		
-		incidenceMatrix[i,j] = (int)val;
-
-		if(OnRoadWeightChanged != null)
-			OnRoadWeightChanged(roadHash, incidenceMatrix[i,j]);
-	}
-
-
-
-	public static float RelativeWeigth(int weight)
-	{
-		return (float)weight / (float)MaxWeight;
-	}
-}
 
 static class EventHandlerExtenstions
 {
@@ -260,193 +15,6 @@ static class EventHandlerExtenstions
 	}
 }
 
-class AStar
-{
-	public interface IState
-	{
-		void foo();
-	}
-
-	class State : IState, IComparable<State>
-	{
-		public int id, g;
-		public float f;
-		public IState prevState;
-
-		#region IState implementation
-
-		public void foo ()
-		{
-			throw new NotImplementedException ();
-		}
-
-		#endregion
-
-		#region IComparable implementation
-		public int CompareTo(State other)
-		{
-			if (other.f > this.f)
-				return -1;
-			else if (other.f == this.f)
-				return 0;
-			else
-				return 1;
-		}
-		#endregion
-	}
-
-	public event EventHandler OnSearchFail;
-	public event EventHandler OnSearchCompleted;
-	public event EventHandler OnNextStepProcessed;
-
-	NodeManager nodeManager;
-	int goalId;
-	Func<int,int,float> heuristic;
-
-	List<State> openSet = new List<State>();
-	List<State> closedSet = new List<State>();
-	State current;
-
-	public int[] GetCurrentPath()
-	{
-		List<int> path = new List<int>();
-
-		for (var state = current; state != null; state = (State)state.prevState)
-			path.Add(state.id);
-		
-		path.Reverse();
-
-//		Debug.Log("Path :");
-//		foreach(var next in path)
-//			Debug.Log(string.Format("Path node: {0}",next));
-
-		return path.ToArray();
-	}
-
-	public void Start(NodeManager nodeManager, int startId, int goalId, Func<int,int,float> heuristic)
-	{
-		this.nodeManager = nodeManager;
-		this.goalId = goalId;
-		this.heuristic = heuristic;
-
-		var startState = new State(){id = startId};
-		openSet.Add(startState);
-	}
-
-	public void NextStep()
-	{
-		Debug.Log("Astar : NextStep()");
-
-		current = GetMinState();
-		Debug.Log(string.Format("Current state :  id = {0} , f = {1}, g = {2}",current.id, current.f, current.g) );
-
-		if(current.id == goalId)
-		{
-			OnSearchCompleted.Notify();
-			return;
-		}
-
-		openSet.Remove(current);
-		closedSet.Add(current);
-
-		RoadData[] roads = nodeManager.GetRoadsForNode(current.id);
-
-		var nextStates = new List<State>();
-
-		foreach(var road in roads)
-		{
-			nextStates.Add(new State() {id = road.To.Id, g = road.Weight + current.g });
-		}
-
-		foreach(var next in nextStates)
-		{
-			if (ContainsState(closedSet,next))
-				continue;
-
-			int tentativeG = current.g + nodeManager.GetRoadWeight(NodeManager.GetRoadHash(current.id,next.id));
-
-			bool tentativeIsBetter = false;
-
-			var nextFromOpenSet = GetStateFromOpen(next);
-
-			if(nextFromOpenSet == null)
-			{
-				openSet.Add(next);
-				tentativeIsBetter = true;
-				nextFromOpenSet = next;
-			}
-			else
-			{
-				if(tentativeG < nextFromOpenSet.g)
-					tentativeIsBetter = true;
-			}
-
-			if(tentativeIsBetter)
-			{
-				nextFromOpenSet.prevState = current;
-				nextFromOpenSet.g = tentativeG;
-				nextFromOpenSet.f = tentativeG + heuristic(next.id, goalId);					
-			}
-
-		}
-
-		if(openSet.Count == 0)
-		{
-			OnSearchFail.Notify();
-			return;
-		}
-
-		openSet.Sort();
-
-		OnNextStepProcessed.Notify();
-	}
-
-	State GetMinState ()
-	{
-		State min = openSet[0];
-
-		foreach(var s in openSet)
-		{
-			if(min.f > s.f)
-				min = s;
-		}
-
-		return min;
-	}
-
-//	bool IsAvailableState (State current, NodeData to)
-//	{
-//		if (current.prevState == null)
-//			return true;
-//		
-//		for (State state = current.prevState as State; state != null; state = (State)state.prevState)
-//		{
-//			if (state.id == to.Id)
-//				return false;
-//		}
-//		return true;
-//	}
-
-	bool ContainsState(List<State> states, State state)
-	{
-		foreach(var s in states)
-		{
-			if(s.id == state.id)
-				return true;
-		}
-		return false;
-	}
-
-	State GetStateFromOpen(State s)
-	{
-		foreach(var state in openSet)
-		{
-			if(state.id == s.id)
-				return state;
-		}
-		return null;
-	}
-}
 
 public class World : MonoBehaviour 
 {
@@ -459,14 +27,18 @@ public class World : MonoBehaviour
 	Dictionary<int,GameObject> nodesObjects;
 	Dictionary<long,LineRenderer> lineRenderers;
 
+	Color defaultColor;
+	Color startColor = Color.blue;
+	Color finishColor = Color.red;
+
 	public delegate void WorldModeChangedDelegate(bool isPresetMode);
 	public event WorldModeChangedDelegate OnWorldModeChanged;
 
 	public event EventHandler OnPauseToggled;
 
-	bool _isPresetMode;
+	bool _isPresetMode = true;
 
-	bool IsPresetMode 
+	public bool IsPresetMode 
 	{
 		get{ return _isPresetMode;}
 		set
@@ -480,7 +52,7 @@ public class World : MonoBehaviour
 
 	bool _isPause;
 
-	bool IsPause 
+	public bool IsPause 
 	{
 		get {return _isPause;}
 		set
@@ -492,8 +64,18 @@ public class World : MonoBehaviour
 
 	AStar astar;
 
+	enum SelectionState
+	{
+		NONE,
+		START,
+		FINISH
+	};
+
+	SelectionState state = SelectionState.NONE;
+
 	void Awake () 
 	{
+		defaultColor = nodePrefab.GetComponent<SpriteRenderer>().color;
 		Load();		
 		CreateNodesGameObjects();
 		CreateRoadsGameObjects();
@@ -503,7 +85,7 @@ public class World : MonoBehaviour
 	void Start()
 	{
 		TestSelectStartAndFinish();
-		StartDemonstration();
+//		StartDemonstration();
 	}
 
 	void Load ()
@@ -558,6 +140,9 @@ public class World : MonoBehaviour
 			var color = GetRoadColor(weight);
 			lineRenderers[roadHash].SetColors(color,color);
 		};
+
+		nodeManager.OnStartNodeChanged += (sender, e) => UpdateNodes(null);
+		nodeManager.OnFinishNodeChanged += (sender, e) => UpdateNodes(null);
 	}
 
 	void CreateNodesGameObjects()
@@ -602,9 +187,28 @@ public class World : MonoBehaviour
 			pos.x = 0.9f * ((nodeData.Position.x - min.x) * scaleX - width/2); 
 			pos.y = 0.9f * ((nodeData.Position.y - min.y) * scaleY - height/2);
 			go.transform.position = pos;
+
+			var controller = go.GetComponent<NodeController>();
+			controller.id = nodeData.Id;
+			controller.clickCallback = OnNodeClicked;
 		}
 	}
 
+	void OnNodeClicked(int id)
+	{
+		switch(state)
+		{
+			case SelectionState.START:
+				nodeManager.StartNodeId = id;
+				break;
+
+			case SelectionState.FINISH:
+				nodeManager.FinishNodeId = id;
+				break;
+		}
+		
+		state = SelectionState.NONE;
+	}
 
 	void CreateRoadsGameObjects ()
 	{
@@ -661,45 +265,30 @@ public class World : MonoBehaviour
 
 	void TestSelectStartAndFinish ()
 	{
-		nodeManager.StartNode = 0;
-		nodeManager.FinishNode = 8;
-
-		nodesObjects[nodeManager.StartNode].GetComponent<SpriteRenderer>().color = Color.blue;
-		nodesObjects[nodeManager.FinishNode].GetComponent<SpriteRenderer>().color = Color.red;
-
+		nodeManager.StartNodeId = 0;
+		nodeManager.FinishNodeId = 8;
 	}
 
-	// preset mode actions
-	
-//	public void SelectStartNode()
-//	{
-//		// hide unused controls
-//		// show cancel button
-//
-//	}	
-
-	public void OnStartNodeChanged(int hash)
+	void SetNodeColor(int nodeId, Color color)
 	{
-
+		nodesObjects[nodeId].GetComponent<SpriteRenderer>().color = color;
 	}
 
-	public void OnFinishNodeNodeChanged(int hash)
+	public void SelectStartNode()
 	{
-		
+		state = SelectionState.START;
 	}
 
-//	public void SelectFinishNode()
-//	{
-//		// hide unused controls
-//		// show cancel button
-//
-//	}
-//	
+	public void SelectFinishNode()
+	{
+		state = SelectionState.FINISH;
+	}
+
 //	public void SelectHeuristic()
 //	{
 //		// show selection buttons
 //	}
-//
+
 	public void StartDemonstration()
 	{
 		IsPresetMode = false;
@@ -718,15 +307,17 @@ public class World : MonoBehaviour
 			Debug.Log("OnSearchCompleted");
 			UpdateWorldView ();
 			IsPresetMode = true;
+			IsPause = false;
 		};
 
 		astar.OnSearchFail += (sender, e) => 
 		{
 			Debug.Log("OnSearchFail");
 			IsPresetMode = true;
+			IsPause = false;
 		};
 
-		astar.Start(nodeManager,nodeManager.StartNode, nodeManager.FinishNode, (a,b) =>
+		astar.Start(nodeManager, (a,b) =>
 		{
 			var posA = nodeManager.nodes[a].Position;
 			var posB = nodeManager.nodes[b].Position;
@@ -767,7 +358,32 @@ public class World : MonoBehaviour
 			pair.Value.SetColors(color,color);
 		}
 
-		// update gui
+		// update nodes
+
+		UpdateNodes(currentPath);
+
+	}
+
+	void UpdateNodes(int[] currentPath)
+	{
+		foreach(var pair in nodesObjects)
+		{
+			if(pair.Key == nodeManager.StartNodeId)
+				SetNodeColor(pair.Key,startColor);
+			else if (pair.Key == nodeManager.FinishNodeId)
+				SetNodeColor(pair.Key,finishColor);
+			else if(currentPath != null && currentPath.Contains(pair.Key))
+			{
+				SetNodeColor(pair.Key,defaultColor);
+			}
+			else
+			{
+				var color = defaultColor;
+				color.a = 0.5f;
+				SetNodeColor(pair.Key,color);
+			}
+		}
+
 	}
 
 	float time = 0;
