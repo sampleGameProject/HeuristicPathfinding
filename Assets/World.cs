@@ -136,6 +136,16 @@ public class NodeManager
 	public Dictionary<int,NodeData> nodes; 
 	public int[,] incidenceMatrix;
 
+	public int StartNode {
+		get;
+		set;
+	}
+
+	public int FinishNode {
+		get;
+		set;
+	}
+
 	public NodeManager(NodeData[] nodes,int[,] incidenceMatrix)
 	{
 		this.nodes = new Dictionary<int,NodeData>();
@@ -206,7 +216,7 @@ public class NodeManager
 
 	public static long GetRoadHash(int i, int j)
 	{
-		return (long)(((ulong)i) << 32 | ((ulong)j));
+		return (long)((((ulong)(Mathf.Min (i,j)))) << 32 | ((ulong)(Mathf.Max (i,j))));
 	}
 
 	public int GetRoadWeight (long roadHash)
@@ -233,6 +243,8 @@ public class NodeManager
 			OnRoadWeightChanged(roadHash, incidenceMatrix[i,j]);
 	}
 
+
+
 	public static float RelativeWeigth(int weight)
 	{
 		return (float)weight / (float)MaxWeight;
@@ -255,7 +267,7 @@ class AStar
 		void foo();
 	}
 
-	class State : IState
+	class State : IState, IComparable<State>
 	{
 		public int id, g;
 		public float f;
@@ -268,6 +280,18 @@ class AStar
 			throw new NotImplementedException ();
 		}
 
+		#endregion
+
+		#region IComparable implementation
+		public int CompareTo(State other)
+		{
+			if (other.f > this.f)
+				return -1;
+			else if (other.f == this.f)
+				return 0;
+			else
+				return 1;
+		}
 		#endregion
 	}
 
@@ -292,6 +316,10 @@ class AStar
 		
 		path.Reverse();
 
+//		Debug.Log("Path :");
+//		foreach(var next in path)
+//			Debug.Log(string.Format("Path node: {0}",next));
+
 		return path.ToArray();
 	}
 
@@ -301,13 +329,16 @@ class AStar
 		this.goalId = goalId;
 		this.heuristic = heuristic;
 
-		var startState = new State(){id = startId, f = heuristic(startId,goalId), g = 0};
+		var startState = new State(){id = startId};
 		openSet.Add(startState);
 	}
 
 	public void NextStep()
 	{
+		Debug.Log("Astar : NextStep()");
+
 		current = GetMinState();
+		Debug.Log(string.Format("Current state :  id = {0} , f = {1}, g = {2}",current.id, current.f, current.g) );
 
 		if(current.id == goalId)
 		{
@@ -324,8 +355,7 @@ class AStar
 
 		foreach(var road in roads)
 		{
-			if(IsAvailableState(current, road.To))
-				nextStates.Add(new State() {id = road.To.Id, g = road.Weight + current.g, prevState = current });
+			nextStates.Add(new State() {id = road.To.Id, g = road.Weight + current.g });
 		}
 
 		foreach(var next in nextStates)
@@ -333,19 +363,31 @@ class AStar
 			if (ContainsState(closedSet,next))
 				continue;
 
-			int g = current.g + nodeManager.GetRoadWeight(NodeManager.GetRoadHash(current.id,next.id));
+			int tentativeG = current.g + nodeManager.GetRoadWeight(NodeManager.GetRoadHash(current.id,next.id));
 
-			bool inOpenSet = ContainsState(openSet, next);
+			bool tentativeIsBetter = false;
 
-			if (!inOpenSet || g < next.g)
+			var nextFromOpenSet = GetStateFromOpen(next);
+
+			if(nextFromOpenSet == null)
 			{
-				next.prevState = current;
-				next.g = g;
-				next.f = g + heuristic(next.id, goalId);
-				
-				if (!inOpenSet)
-					openSet.Add(next);
+				openSet.Add(next);
+				tentativeIsBetter = true;
+				nextFromOpenSet = next;
 			}
+			else
+			{
+				if(tentativeG < nextFromOpenSet.g)
+					tentativeIsBetter = true;
+			}
+
+			if(tentativeIsBetter)
+			{
+				nextFromOpenSet.prevState = current;
+				nextFromOpenSet.g = tentativeG;
+				nextFromOpenSet.f = tentativeG + heuristic(next.id, goalId);					
+			}
+
 		}
 
 		if(openSet.Count == 0)
@@ -372,18 +414,18 @@ class AStar
 		return min;
 	}
 
-	bool IsAvailableState (State current, NodeData to)
-	{
-		if (current.prevState == null)
-			return true;
-		
-		for (State state = current.prevState as State; state != null; state = (State)state.prevState)
-		{
-			if (state.id == to.Id)
-				return false;
-		}
-		return true;
-	}
+//	bool IsAvailableState (State current, NodeData to)
+//	{
+//		if (current.prevState == null)
+//			return true;
+//		
+//		for (State state = current.prevState as State; state != null; state = (State)state.prevState)
+//		{
+//			if (state.id == to.Id)
+//				return false;
+//		}
+//		return true;
+//	}
 
 	bool ContainsState(List<State> states, State state)
 	{
@@ -395,6 +437,15 @@ class AStar
 		return false;
 	}
 
+	State GetStateFromOpen(State s)
+	{
+		foreach(var state in openSet)
+		{
+			if(state.id == s.id)
+				return state;
+		}
+		return null;
+	}
 }
 
 public class World : MonoBehaviour 
@@ -411,13 +462,48 @@ public class World : MonoBehaviour
 	public delegate void WorldModeChangedDelegate(bool isPresetMode);
 	public event WorldModeChangedDelegate OnWorldModeChanged;
 
-	bool isPresetMode = true;
+	public event EventHandler OnPauseToggled;
+
+	bool _isPresetMode;
+
+	bool IsPresetMode 
+	{
+		get{ return _isPresetMode;}
+		set
+		{
+			_isPresetMode = value;
+
+			if(OnWorldModeChanged != null)
+				OnWorldModeChanged(_isPresetMode);
+		}
+	}
+
+	bool _isPause;
+
+	bool IsPause 
+	{
+		get {return _isPause;}
+		set
+		{
+			_isPause = value;
+			OnPauseToggled.Notify();
+		}
+	}
+
+	AStar astar;
 
 	void Awake () 
 	{
 		Load();		
 		CreateNodesGameObjects();
 		CreateRoadsGameObjects();
+
+	}
+
+	void Start()
+	{
+		TestSelectStartAndFinish();
+		StartDemonstration();
 	}
 
 	void Load ()
@@ -430,9 +516,11 @@ public class World : MonoBehaviour
 			new NodeData(){Id = 1, Position = new Vector3(50,10,0)},
 			new NodeData(){Id = 2, Position = new Vector3(90,60,0)},
 			new NodeData(){Id = 3, Position = new Vector3(50,200,0)},
-			new NodeData(){Id = 4, Position = new Vector3(60,60,0)},
+			new NodeData(){Id = 4, Position = new Vector3(60,100,0)},
 			new NodeData(){Id = 5, Position = new Vector3(10,90,0)},
-			new NodeData(){Id = 6, Position = new Vector3(160,150,0)}
+			new NodeData(){Id = 6, Position = new Vector3(160,150,0)},
+			new NodeData(){Id = 7, Position = new Vector3(150,50,0)},
+			new NodeData(){Id = 8, Position = new Vector3(160,30,0)}
 		};
 
 		int size = nodes.GetLength(0);
@@ -446,14 +534,22 @@ public class World : MonoBehaviour
 		incs[0,1] = 10;
 		incs[0,2] = 20;
 		incs[0,3] = 50;
+		incs[0,5] = 10;
 
 		incs[1,2] = 30;
-		incs[1,3] = 90;
+		
+		incs[2,4] = 35;	
+		incs[2,6] = 50;
 
 		incs[3,5] = 80;
-		incs[2,4] = 5;
-		incs[4,6] = 20;	
-		incs[2,6] = 50;
+		incs[3,6] = 60;
+
+		incs[4,5] = 20;	
+		incs[4,6] = 20;
+
+		incs[6,7] = 30;
+		incs[6,8] = 70;
+		incs[7,8] = 50;
 
 		nodeManager = new NodeManager(nodes,incs);
 
@@ -563,44 +659,151 @@ public class World : MonoBehaviour
 		}
 	}
 
+	void TestSelectStartAndFinish ()
+	{
+		nodeManager.StartNode = 0;
+		nodeManager.FinishNode = 8;
+
+		nodesObjects[nodeManager.StartNode].GetComponent<SpriteRenderer>().color = Color.blue;
+		nodesObjects[nodeManager.FinishNode].GetComponent<SpriteRenderer>().color = Color.red;
+
+	}
+
 	// preset mode actions
 	
-	public void SelectStartNode()
+//	public void SelectStartNode()
+//	{
+//		// hide unused controls
+//		// show cancel button
+//
+//	}	
+
+	public void OnStartNodeChanged(int hash)
 	{
-		
-	}	
-	
-	public void SelectFinishNode()
-	{
-		
+
 	}
-	
-	public void SelectHeuristic()
+
+	public void OnFinishNodeNodeChanged(int hash)
 	{
 		
 	}
 
+//	public void SelectFinishNode()
+//	{
+//		// hide unused controls
+//		// show cancel button
+//
+//	}
+//	
+//	public void SelectHeuristic()
+//	{
+//		// show selection buttons
+//	}
+//
 	public void StartDemonstration()
 	{
-		
+		IsPresetMode = false;
+		time = 0;
+
+		astar = new AStar();
+
+		astar.OnNextStepProcessed += (sender, e) => 
+		{
+			Debug.Log("OnNextStepProcessed");
+			UpdateWorldView();
+		};
+
+		astar.OnSearchCompleted += (sender, e) => 
+		{
+			Debug.Log("OnSearchCompleted");
+			UpdateWorldView ();
+			IsPresetMode = true;
+		};
+
+		astar.OnSearchFail += (sender, e) => 
+		{
+			Debug.Log("OnSearchFail");
+			IsPresetMode = true;
+		};
+
+		astar.Start(nodeManager,nodeManager.StartNode, nodeManager.FinishNode, (a,b) =>
+		{
+			var posA = nodeManager.nodes[a].Position;
+			var posB = nodeManager.nodes[b].Position;
+			return Vector3.Distance(posA,posB);
+		});
 	}
-	
-	
-	// demonstration mode actions
+
+	void UpdateWorldView ()
+	{
+		// select roads at current path
+
+		var currentPath = astar.GetCurrentPath();
+
+		var roads = new List<long>();
+
+		for(int i = 0; i < currentPath.Count() - 1; i++)
+		{
+			long hash = NodeManager.GetRoadHash(currentPath[i],currentPath[i+1]);
+			roads.Add(hash);
+		}
+
+		foreach(var pair in lineRenderers)
+		{
+			const float defaultWidth = 0.07f;
+			const float roadWidth = 0.15f;
+			var color = GetRoadColor(nodeManager.GetRoadWeight(pair.Key));
+
+			if(!roads.Contains(pair.Key))
+			{
+				color.a = 0.3f;
+				pair.Value.SetWidth(defaultWidth,defaultWidth);
+			}
+			else
+			{
+				pair.Value.SetWidth(roadWidth,roadWidth);
+			}
+				
+			pair.Value.SetColors(color,color);
+		}
+
+		// update gui
+	}
+
+	float time = 0;
+	const float STEP_TIME = 1;
+
+	void Update()
+	{
+		if(IsPresetMode)
+			return;
+
+		if(IsPause)
+			return;
+
+		time += Time.deltaTime;
+		if(time > STEP_TIME)
+		{
+			astar.NextStep();
+			time -= STEP_TIME;
+		}
+	}
 
 	public void TogglePause()
 	{
-
+		if(!IsPresetMode)
+			IsPause = !IsPause;
 	}
 
 	public void StopDemonstration()
 	{
-
+		IsPresetMode = true;
+		astar = null;
 	}
 
 	public void ProcessNextStep()
 	{
-
+		astar.NextStep();
 	}
 }
 
