@@ -47,7 +47,9 @@ public class GUIManager : MonoBehaviour
 
 		world.OnPauseToggled += (sender, e) => 
 		{
-			pauseButton.GetComponentInChildren<Text>().text = world.IsPause ? PAUSE_ACTIVE : PAUSE_NOT_ACTIVE;
+			var text = pauseButton.GetComponentInChildren<Text>();
+			if(text != null)
+				text.text = world.IsPause ? PAUSE_ACTIVE : PAUSE_NOT_ACTIVE;
 			nextStepButton.interactable = world.IsPause;
 		};
 	}
