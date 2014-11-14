@@ -86,6 +86,8 @@ public class World : MonoBehaviour
 	{
 		TestSelectStartAndFinish();
 //		StartDemonstration();
+
+		SMAStar.Test();
 	}
 
 	void Load ()

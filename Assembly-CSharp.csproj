@@ -49,9 +49,9 @@
      <Compile Include="Assets\AStar.cs" />
      <Compile Include="Assets\ColorHelper.cs" />
      <Compile Include="Assets\GUIManager.cs" />
-     <Compile Include="Assets\MSAStar.cs" />
      <Compile Include="Assets\NodeController.cs" />
      <Compile Include="Assets\NodeManager.cs" />
+     <Compile Include="Assets\SMAStar.cs" />
      <Compile Include="Assets\SceneObject.cs" />
      <Compile Include="Assets\World.cs" />
  <Reference Include="UnityEngine.UI">
