@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System;
 
 
 public class Problem
@@ -27,18 +28,15 @@ public class SMAStar
 
 	class State
 	{
-		public int depth, f, g, fs, id, prevId;
-		public int nodeId;
+		public int depth, fs;
+		public float f, g;
+		public int nodeId, prevId;
+	
+		public bool IsEqual(State other)
+		{
+			return nodeId == other.nodeId && prevId == other.prevId;
+		}
 	}
-
-//	List<int> nodesList = new List<int>();
-//
-//	Dictionary<int,int> fs = new Dictionary<int, int>();
-//	Dictionary<int,int> f = new Dictionary<int, int>();
-//	Dictionary<int,int> depth = new Dictionary<int, int>();
-//
-//	Dictionary<int,List<int>> successors = new Dictionary<int,List<int>>();
-
 
 	List<State> nodes = new List<State>();
 
@@ -88,49 +86,63 @@ public class SMAStar
 		incs[6,4] = 8;
 		
 		NodeManager nodeManager = new NodeManager(nodes,incs);
+
+		var problem = new Problem(0,4);
+
+		var sma = new SMAStar(nodeManager,problem,3,3,(a,b) =>
+      {
+			var posA = nodeManager.nodes[a].Position;
+			var posB = nodeManager.nodes[b].Position;
+			return Vector3.Distance(posA,posB);
+		});
+
+		while(sma.NextStep() != null)
+		{
+			Debug.Log("Do one more step...");
+		}
+
 	}
 
-	public SMAStar(NodeManager manager, Problem problem , int maxSize, int maxDepth)
+	Func<int,int,float> heuristic;
+
+	public SMAStar(NodeManager manager, Problem problem , int maxSize, int maxDepth,Func<int,int,float> h)
 	{
+		this.heuristic = h;
 		this.manager = manager;
 		this.maxDepth = maxDepth;
 		this.maxSize = maxSize;
 		this.problem = problem;
 
-//		PrepareData();
-
 		nodes.Add(new State()
 		{ 	
-			id 		= 0, 
 			nodeId 	= problem.Start, 
-			f 		= H(problem.Start)
+			prevId = -1,
+			f 		= H(problem.Start),
+			depth = 0
 		});
 	}
-
-//	void PrepareData ()
-//	{
-//		//TODO: setup all dictionaries
-//	}
 
 	object NextStep()
 	{
 		if(QueueIsEmpty())
+		{
 			return null;//failture
-
-		State nodeState = PopDeepestLowestFCostNode();
+		}
+			
+		State nodeState = GetDeepestLowestFCostNode();
 
 		if(problem.IsGoal(nodeState.nodeId))
 			return ReconstructPath(); //success
 
 		var s = GetNextSuccessor(nodeState);
 
-		if(!problem.IsGoal(s) && s.depth == maxDepth - 1)
+		if(!problem.IsGoal(s.nodeId) && s.depth == maxDepth - 1)
 		{
 			s.f = INFINITY;
 		}
 		else
 		{
-			s.f = Mathf.Max(nodeState.f, G(s) + H(s));
+			s.f = Mathf.Max(nodeState.f, G(s) + H(s.nodeId));
 		}
 
 		if(NoMoreSuccessors(nodeState))
@@ -138,218 +150,50 @@ public class SMAStar
 			UpdateNodeFCost(nodeState);
 		}
 
-		if(AllNodeSuccessorsAreEnqueued(nodeState))
-		{
-			nodes.Remove(nodeState);
-		}
+//		if(AllNodeSuccessorsAreEnqueued(nodeState))
+//		{
+//			nodes.Remove(nodeState);
+//		}
 
 		if(MemoryIsFull())
 		{
 			var badNode = GetShallowestNodeWithHightestFCost();
+			nodes.Remove(badNode);
 
-			State[] badNodeParents = GetNodeParents(badNode);
-
-			foreach(var parent in badNodeParents)
-			{
-				parent.successors.Remove(badNode);
-
-				if(parent.fs > badNode.f)
-				{
-					parent.fs = badNode.f;
-				}
-
-				if(needed)
-					nodes.Add(parent);
-			}
+//			State[] badNodeParents = GetNodeParents(badNode);
+//
+//			foreach(var parent in badNodeParents)
+//			{
+//				parent.successors.Remove(badNode);
+//
+//				if(parent.fs > badNode.f)
+//				{
+//					parent.fs = badNode.f;
+//				}
+//
+//				if(needed)
+//					nodes.Add(parent);
+//			}
 		}
 
 		nodes.Add(s);
+
+		return nodes;
 	}
 
-//	object NextStep()
-//	{
-//		
-//
-//		while(true)
-//		{
-//			if(QueueIsEmpty())
-//				return null;//failture
-//		
-//			int node = PopDeepestLowestFCostNode();
-//
-//			if(problem.IsGoal(node))
-//				return ReconstructPath(); //success
-//
-//			int s = GetNextSuccessor(node);
-//
-//			if(!problem.IsGoal(s) && depth[s] == maxDepth-1)
-//			{
-//				f[s] = INFINITY;
-//			}
-//			else
-//			{
-//				f[s] = Mathf.Max(f[node], G(s) + H(s));
-//			}
-//
-//			if(NoMoreSuccessors(node))
-//			{
-//				UpdateNodeFCost(node);
-//			}
-//
-//			if(AllNodeSuccessorsAreEnqueued(node))
-//			{
-//				nodesList.Remove(node);
-//			}
-//
-//			if(MemoryIsFull())
-//			{
-//				var badNode = GetShallowestNodeWithHightestFCost();
-//
-//				int[] badNodeParents = GetNodeParents(badNode);
-//
-//				foreach(var parent in badNodeParents)
-//				{
-//					successors[parent].Remove(badNode);
-//
-//					if(fs[parent] > f[badNode])
-//					{
-//						fs[parent] = f[badNode];
-//					}
-//
-//					if(needed)
-//						nodesList.Add(parent);
-//				}
-//			}
-//
-//			nodesList.Add(s);
-//		}
-//
-//	}
-//
 	bool MemoryIsFull()
 	{
 		return nodes.Count == maxSize;
 	}
-//
-//
-//	int GetNextSuccessor (int node)
-//	{
-//		for(int i = 0; i < successors[node].Count; i++)
-//		{
-//			var s = successors[node];
-//			if(!nodesList.Contains(s))
-//			{
-//				// setup deep
-//				depth[s] = depth[node] + 1;
-//				return s;
-//			}
-//		}
-//		
-//		return -1;
-//	}
-//
-//	bool NoMoreSuccessors (int node)
-//	{
-//		for(int i = 0; i < successors[node].Count; i++)
-//		{
-//			if(!nodesList.Contains(successors[node]))
-//				return false;
-//		}
-//
-//		return true;
-//	}
-//
-//	
-//	bool AllNodeSuccessorsAreEnqueued (int node)
-//	{
-//		return !NoMoreSuccessors(node);
-//	}
-//
-//	int PopDeepestLowestFCostNode ()
-//	{
-//		int ret = nodesList[0];
-//		for(int i = 1; i < nodesList.Count; i++)
-//		{
-//			var cur = nodesList[i];
-//
-//			if(depth[ret] <= depth[cur] && f[ret] >= f[cur])
-//				ret = cur;
-//		}
-//
-//		nodesList.Remove(ret);
-//		return ret;
-//	}
-//
-//	bool QueueIsEmpty ()
-//	{
-//		return nodesList.Count == 0;
-//	}
-//
-//	object ReconstructPath ()
-//	{
-//		throw new System.NotImplementedException ();
-//	}
-//
-//
-//	int GetShallowestNodeWithHightestFCost()
-//	{
-//		int ret = nodesList[0];
-//		for(int i = 1; i < nodesList.Count; i++)
-//		{
-//			var cur = nodesList[i];
-//			
-//			if(depth[ret] >= depth[cur] && f[ret] <= f[cur])
-//				ret = cur;
-//		}
-//		
-//		return ret;
-//	}
-//
-//	int[] GetNodeParents (int badNode)
-//	{
-//		List<int> parents = new List<int>();
-//
-//		foreach(var node in manager.nodes)
-//		{
-//			if(successors[node].Contains(badNode))
-//				parents.Add(node);
-//		}
-//
-//		return parents.ToArray();
-//	}
-//
-//	void UpdateNodeFCost (int node)
-//	{
-//		float minSuccessorF = float.MaxValue;
-//
-//		foreach(var s in successors[node])
-//		{
-//			if(f[s] < minSuccessorF)
-//			{
-//				minSuccessorF = f[s];
-//			}
-//		}
-//		f[node] = minSuccessorF;
-//	}
-//
-//	float G (int s)
-//	{
-//		throw new System.NotImplementedException ();
-//	}
-//
-//	float H (int s)
-//	{
-//		throw new System.NotImplementedException ();
-//	}
 
 	float H (int nodeId)
 	{
-		throw new System.NotImplementedException ();
+		return heuristic(nodeId,problem.Goal);
 	}
 
 	float G (State s)
 	{
-		throw new System.NotImplementedException ();
+		return manager.GetRoadWeight(NodeManager.GetRoadHash(s.nodeId,s.prevId));
 	}
 
 	bool QueueIsEmpty ()
@@ -357,18 +201,24 @@ public class SMAStar
 		return nodes.Count == 0;
 	}
 
-	State PopDeepestLowestFCostNode ()
+	State GetDeepestLowestFCostNode ()
 	{
 		var ret = nodes[0];
 		for(int i = 1; i < nodes.Count; i++)
 		{
 			var cur = nodes[i];
 
-			if(ret.depth <= cur.depth && ret.f >= cur.f)
+			if(ret.depth < cur.depth)
+			{
 				ret = cur;
+			}
+			else if(ret.depth == cur.depth && ret.f >= cur.f)
+			{
+				ret = cur;
+			}
 		}
 
-		nodes.Remove(ret);
+//		nodes.Remove(ret);
 		return ret;
 	}
 
@@ -380,25 +230,53 @@ public class SMAStar
 
 		foreach(var road in roads)
 		{
-			if(!AlreadyInNodes(road.To.Id,))
+			if(nodeState.prevId == road.To.Id)
+				continue;
+
+			if(!AlreadyInNodes(stateNodeId,road.To.Id))
 			{
 				return new State()
 				{
 					depth = nodeState.depth + 1,
-					nodeId = road.To
+					prevId = stateNodeId,
+					nodeId = road.To.Id
 				};
 			}
 		}
+
+		return null;
+	}
+
+	bool AlreadyInNodes (int nodeId, int nodeToId)
+	{
+		foreach(var node in nodes)
+		{
+			if(node.prevId == nodeId && node.nodeId == nodeToId)
+				return true;
+		}
+
+		return false;
 	}
 
 	bool NoMoreSuccessors (State nodeState)
 	{
-		throw new System.NotImplementedException ();
+		return GetNextSuccessor(nodeState) == null;
 	}
 
 	void UpdateNodeFCost (State nodeState)
 	{
-		throw new System.NotImplementedException ();
+		float minF = float.MaxValue;
+
+		foreach(var node in nodes)
+		{
+			if(node == nodeState)
+				continue;
+
+			if(node.f < minF)
+				node.f = minF;
+		}
+
+		nodeState.f = minF;
 	}
 
 	bool AllNodeSuccessorsAreEnqueued (object node)
@@ -420,8 +298,14 @@ public class SMAStar
 		return ret;
 	}
 
-	State[] GetNodeParents (State badNode)
+//	State[] GetNodeParents (State badNode)
+//	{
+//		throw new System.NotImplementedException ();
+//	}
+
+	object ReconstructPath ()
 	{
+		Debug.Log("ReconstructPath()");
 		throw new System.NotImplementedException ();
 	}
 

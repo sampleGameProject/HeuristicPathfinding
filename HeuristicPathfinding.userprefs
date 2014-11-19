@@ -1,15 +1,24 @@
 ﻿<Properties>
-  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.Default" />
   <MonoDevelop.Ide.Workbench ActiveDocument="Assets\SMAStar.cs">
     <Files>
-      <File FileName="Assets\SMAStar.cs" Line="131" Column="7" />
+      <File FileName="Assets\SMAStar.cs" Line="154" Column="6" />
       <File FileName="Assets\NodeController.cs" Line="1" Column="1" />
       <File FileName="Assets\World.cs" Line="1" Column="1" />
       <File FileName="Assets\GUIManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\AStar.cs" Line="1" Column="1" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>
-    <BreakpointStore />
+    <BreakpointStore>
+      <Breakpoint file="C:\Users\admin\Documents\GitHub\HeuristicPathfinding\Assets\SMAStar.cs" line="137" />
+      <Breakpoint file="C:\Users\admin\Documents\GitHub\HeuristicPathfinding\Assets\SMAStar.cs" line="161" />
+      <Breakpoint file="C:\Users\admin\Documents\GitHub\HeuristicPathfinding\Assets\SMAStar.cs" line="238" />
+      <Breakpoint file="C:\Users\admin\Documents\GitHub\HeuristicPathfinding\Assets\SMAStar.cs" line="150" />
+      <Breakpoint file="C:\Users\admin\Documents\GitHub\HeuristicPathfinding\Assets\SMAStar.cs" line="247" />
+    </BreakpointStore>
   </MonoDevelop.Ide.DebuggingService.Breakpoints>
-  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches>
+    <Watch file="Assets\SMAStar.cs" line="179" offsetX="236" offsetY="3026" expression="s" liveUpdate="False" />
+  </MonoDevelop.Ide.DebuggingService.PinnedWatches>
 </Properties>
